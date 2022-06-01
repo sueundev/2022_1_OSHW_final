@@ -8,6 +8,11 @@ int onof_state = 0;   // 전원 : 1은 ON, 0은 OFF
 int auto_start[] = {784, 784, 880, 880, 784, 784, 659}; 
 int auto_start_t[] = {300, 300, 300, 300, 300, 300, 600};
 
+int on[] = {784, 659, 587};
+int on_t[] = {400, 400, 400};
+int off[] = {587, 659, 784};
+int off_t[] = {400, 400, 400};
+
 // 리모컨 include
 #include <IRremote.h>
 int RECV_PIN = 11;
@@ -49,11 +54,15 @@ void rmt() {
       //전원 ON/OFF
       case BTN_EQ :
         if (onof_state == 0) {
+          for (int i = 0; i < 7; i++)
+            TimerFreeTone(10, on[i], on_t[i]);
           Serial.println("ON");
           onof_state = 1;
         }
         else {
           Serial.println("OFF");
+          for (int i = 0; i < 7; i++)
+            TimerFreeTone(10, off[i], off_t[i]);
           onof_state = 0;
         }
         break; 
