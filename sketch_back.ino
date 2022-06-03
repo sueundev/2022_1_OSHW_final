@@ -1,3 +1,7 @@
+// 초음파 센서 init
+int trigPin = 11;
+int echoPin = 10;
+
 // 부저 include
 #include <TimerFreeTone.h>
 
@@ -20,7 +24,6 @@ float distance; // 초음파 센서 거리
 // 부저 음악 배열
 int auto_start[] = {523, 523, 784, 784, 880, 880, 784};
 int auto_start_t[] = {400, 400, 400, 400, 400, 400, 600};
-
 int onof[] = {587, 659, 784};
 int onof_t[] = {400, 400, 400};
 
@@ -53,20 +56,42 @@ int onof_t[] = {400, 400, 400};
 #define BTN_8          0xFF4AB5
 #define BTN_9          0xFF52AD
 
+// 초음파 센서 함수
+float ultra() {
+  digitalWrite(trigPin, HIGH);
+  delay(10);
+  digitalWrite(trigPin, LOW);
+
+  // HIGH일 때 초음파가 보냈다가 돌아오는 시간을 가지고 거리를 계산
+  // 340은 초당 소리의 속도이고 10000은 밀리세컨드를 세컨드로, 왕복거리이므로 2로 나눔
+  duration = pulseIn(echoPin, HIGH);
+  distance = ((float)(340 * duration) / 10000) / 2;
+  delay(100);
+
+  return distance;
+}
+
 // 자동 시작 함수
 void autoStart() {
-  lcd.setCursor(5, 1);
-  lcd.print(t);
-  lcd.print(" sec");
   lcd.clear();
-
-  forward();
-
+  lcd.setCursor(5, 1);
+  lcd.print(t+1);
+  lcd.print(" sec");
+  
+  if(ultra() < 20) {
+    stopMotor();
+    delay(1000);
+    backward();
+    delay(2000);    
+  }
+  else {
+     forward();
+  }
+ 
   if (irrecv.decode(&results)) {
-    if(BTN_5 == results.value) {
+    if (BTN_5 == results.value) {
       stopMotor();
       t = 0;
-      
       return;
     }
     irrecv.resume();
@@ -76,41 +101,43 @@ void autoStart() {
 // 리모컨 조작 함수
 int rmt() {
   switch (results.value) {
-    //전원 ON/OFF
+    // 자동_시작
     case BTN_EQ :
-      if(t <= 0) {
-        lcd.setCursor(0, 0);
+      if (t <= 0) {
+        lcd.setCursor(0, 1);
         lcd.print("please set time");
-        for (int i = 0; i<3; i++) {
+        for (int i = 0; i < 3; i++) {
           TimerFreeTone(12, 500, 300);
           delay(150);
         }
-        delay(3000);
+        delay(2000);
         lcd.clear();
         return;
       }
 
+      lcd.clear();
       lcd.setCursor(5, 0);
       lcd.print("Start!");
       for (int i = 0; i < 7; i++)
         TimerFreeTone(12, auto_start[i], auto_start_t[i]);
       delay(1000);
       lcd.clear();
-      Serial.println("auto_start");
-
+      Serial.write('1');
+      
       // 타이머
-      while (t >= 1) {
+      while (t >= 0) {
         delay(1000);
         t--;
-
+       
         autoStart();
         
         // 만약 타이머가 0이 되면 삐*3 후 멈춤
         if (t == 0) {
+          Serial.write('0');
           stopMotor();
-          lcd.setCursor(0, 0);
+          lcd.setCursor(6, 0);
           lcd.print("END");
-          
+
           for (int i = 0; i < 3; i++)
             TimerFreeTone(12, 784, 500);
           delay(100);
@@ -132,11 +159,14 @@ int rmt() {
     // 타이머+
     case BTN_P :
       t += 15;
-      Serial.println(t);
-      lcd.setCursor(0, 0);
+      if (t > 150) {
+        t = 150;
+      }
+      lcd.clear();
+      lcd.setCursor(4, 0);
       lcd.print("TIME : ");
       lcd.print(t);
-      lcd.clear();
+
       break;
     // 타이머-
     case BTN_M :
@@ -144,14 +174,14 @@ int rmt() {
       if (t < 0) {
         t = 0;
       }
-      Serial.println(t);
-      lcd.setCursor(0, 0);
+      lcd.clear();
+      lcd.setCursor(4, 0);
       lcd.print("TIME : ");
       lcd.print(t);
-      lcd.clear();
+
       break;
-    // 자동_시작
-    case BTN_PP :
+    case BTN_5 :
+      Serial.write('5');
       break;
   }
 }
@@ -163,27 +193,6 @@ int rmt() {
 #define IN2 6
 #define IN1 4
 #define ENA 3
-
-// 모터 번호
-#define CH1 0
-#define CH2 1
-#define ALL_CH 2
-
-// 속도 설정
-// mode : 각 모터를 선택적으로 변경 가능 (CH1/CH2/ALL_CH)
-// speed : 0 ~ 255 까지 가능 (60 이하로는 모터가 거의 동작안함)
-void setMotorSpeed(unsigned char mode, unsigned char speed) {
-  if (mode == CH1) {
-    analogWrite(ENA, speed);
-  }
-  else if (mode == CH2) {
-    analogWrite(ENB, speed);
-  }
-  else {
-    analogWrite(ENA, speed);
-    analogWrite(ENB, speed);
-  }
-}
 
 // 앞으로
 void forward() {
@@ -228,35 +237,35 @@ void stopMotor() {
 void setup() {
   Serial.begin(9600);
 
+  // 모터 핀 설정
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
-
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
 
   // 리모컨 동작 시작
-  Serial.println("Enabling IRin");
   irrecv.enableIRIn();
-  Serial.println("Enabled IRin");
 
   // 이동 바퀴 모터 설정
-  setMotorSpeed(ALL_CH, 255);
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
 
   //LCD 설정
   lcd.init();
   lcd.backlight();
+
+  // 초음파 센서 핀 설정
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 }
 
 void loop() {
   // 리모컨 입력
   if (irrecv.decode(&results)) {
-    Serial.println(results.value, HEX);
     rmt();
     irrecv.resume();
   }
-
-  delay(100);
-
+  delay(3000);
 }
