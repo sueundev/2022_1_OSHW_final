@@ -267,5 +267,5 @@ void loop() {
     rmt();
     irrecv.resume();
   }
-  delay(3000);
+  delay(100);
 }
